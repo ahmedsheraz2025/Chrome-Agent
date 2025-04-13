@@ -19,4 +19,6 @@ The system leverages the power of Google's Gemini AI (`gemini-1.5-flash`) for na
 - **Modular Design**: Easily extendable with new agents or tools for additional functionality.
 - **Environment Configuration**: Securely manages API keys using a `.env` file.
 
+## 📬 Contact
 
+For issues or suggestions, open a GitHub issue or email [ahmedsheraz2025@gmail.com](mailto:ahmedsheraz2025@gmail.com).
