@@ -1,97 +1,115 @@
 from agents import Agent, Runner, AsyncOpenAI, OpenAIChatCompletionsModel, function_tool
 from agents.run import RunConfig
-
 from langchain_google_genai import ChatGoogleGenerativeAI
 from browser_use import Agent as BrowserAgent
+from dotenv import load_dotenv
 import asyncio
 import os
-from dotenv import load_dotenv
+
+
+# Load environment variables from .env file
 load_dotenv()
 
-gemini_api_key = os.getenv("GOOGLE_API_KEY")
 
+# Retrieve Gemini API key from environment variables
+GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GEMINI_API_KEY:
+    raise ValueError("GOOGLE_API_KEY not found in environment variables")
+
+
+# Initialize external client for Gemini API using AsyncOpenAI wrapper
 external_client = AsyncOpenAI(
-    api_key = gemini_api_key,
-    base_url = "https://generativelanguage.googleapis.com/v1beta/openai/" 
+    api_key=GEMINI_API_KEY,
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
 )
+# Configure the Gemini model for the agent system
 model = OpenAIChatCompletionsModel(
-    model = "gemini-1.5-flash",
-    openai_client = external_client,
+    model="gemini-1.5-flash",
+    openai_client=external_client
 )
+# Define run configuration for agents
 config = RunConfig(
     model = model,
     model_provider = external_client,
     tracing_disabled = True
 )
-llm1= ChatGoogleGenerativeAI(
-        model= "gemini-1.5-flash",
-        api_key= gemini_api_key
-    )
+# Initialize LangChain Google Generative AI for browser tasks
+llm_gemini = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    api_key=GEMINI_API_KEY
+)
 
 
 
-
+# Define a tool for browser-based tasks (searching or playing videos)
 @function_tool
-async def search(output: str):
+async def search_tool(query: str) -> None:
     """
-    This cool function is use for searching anything on browsser/ and play videos on youtube
+    Executes a browser task based on the provided query.
+    Can perform searches using BrowserAgent.
+    
+    Args:
+        query (str): The task or search query to execute.
     """
-    agent = BrowserAgent(
-        task=f"{output}",
-        llm=llm1
+    browser_task_agent = BrowserAgent(
+        task=query,
+        llm=llm_gemini
     )
-    await agent.run()
-    
-    
+    await browser_task_agent.run()
+
+# Browser Agent: Handles browser-related tasks like searching
 browser_agent = Agent(
-    name = "Browser Agent",
-    handoff_description = "Specific for browser search",
-    instructions = """You are a browser agent, Your duty is to understand user
-    requirement and do action, you are a seaching master , when you use the provided tool
-    makesure that your prompt (which go to BrowserAgent) must be clearify perfectly 
-    because BrowserAgent (For reference: in line 39) will not run if we dont clearify what I saying
+    name="Browser Agent",
+    handoff_description="Handles browser-based tasks such as searches and YouTube playback",
+    instructions="""
+        You are a specialized agent for browser tasks. Your role is to interpret the user's intent
+        and execute browser actions using the provided search tool. Ensure the query passed to the
+        tool is clear and precise to avoid errors in the BrowserAgent execution.
     """,
-    tools = [search]
-)    
+    tools=[search_tool]
+)
 
-    
-# triage_agent = Agent(
-#     name = "Triage Agent",
-#     instructions = """You are a triage agent. Use provided agent (sub-agent)
-#     so handoffs to the other agent to answer the user
-#     """,
-#     handoffs = [browser_agent]
-# )
-
-
+# Translator Agent: Converts user input into clear, grammatically correct English
 translator_agent = Agent(
-    name = "Translator Agent",
-    instructions = """
-    You are a translator Agent, your main duty is to after getting the input from
-    user in any language e.g, hindi, english , Convert user input into easy, grammly
-    corrected and understandable english.
+    name="Translator Agent",
+    instructions="""
+        You are a language translation expert. Your task is to take user input in any language
+        (e.g., Hindi, English) and convert it into clear, grammatically correct, and concise English.
+        Focus on clarity and simplicity to ensure the output is understandable.
     """
 )
 
-async def main():
-    output = input("Enter what you want to search: ")
-    
-    result = await Runner.run(
-        translator_agent,
-        output,
-        run_config = config     
-    )
-    print(f"Translated: {result.final_output}")
-        
-     
-    response = await Runner.run(
-        browser_agent,
-        result.final_output,
-        run_config = config
-    )
-    
-    print(f"Browser Agent: {response.final_output}")
-    
+async def main() -> None:
+    """
+    Main function to run the agent pipeline:
+    1. Takes user input.
+    2. Translates it to clear English using Translator Agent.
+    3. Passes the translated output to Browser Agent for task execution.
+    """
+    try:
+        # Get user input
+        user_input = input("Enter your query: ")
 
-    
-asyncio.run(main())
+        # Step 1: Translate user input to clear English
+        translation_result = await Runner.run(
+            starting_agent=translator_agent,
+            input=user_input,
+            run_config=config
+        )
+        translated_query = translation_result.final_output
+        print(f"Translated Query: {translated_query}")
+
+        # Step 2: Execute browser task with translated query
+        browser_result = await Runner.run(
+            starting_agent=browser_agent,
+            input=translated_query,
+            run_config=config
+        )
+        print(f"Browser Agent Result: {browser_result.final_output}")
+
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+
+# Run the async main function
+if __name__ == "__main__":
+    asyncio.run(main())
