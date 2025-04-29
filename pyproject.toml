@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "browser-use>=0.1.40",
+    "chainlit>=2.5.5",
     "langchain-google-genai>=2.1.2",
-    "openai-agents>=0.0.9",
+    "openai-agents==0.0.13",
 ]
