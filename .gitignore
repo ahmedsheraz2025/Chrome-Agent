@@ -5,6 +5,7 @@ build/
 dist/
 wheels/
 *.egg-info
+chainlit.md
 
 # Virtual environments
 .venv
